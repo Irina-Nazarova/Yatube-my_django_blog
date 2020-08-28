@@ -1,0 +1,33 @@
+
+<div class="col-md-9">
+        <!-- Начало блока с отдельным постом -->
+        <div class="card mb-3 mt-1 shadow-sm">
+        {% load thumbnail %}
+        {% thumbnail post.image "960x339" crop="center" upscale=True as im %}
+        <img class="card-img" src="{{ im.url }}">
+        {% endthumbnail %}
+            <div class="card-body">
+                <p class="card-text">
+                    <!-- Ссылка на страницу автора в атрибуте href; username автора в тексте ссылки -->
+                    <a href="{{username}}"><strong class="d-block text-gray-dark">@{{post_author}}</strong></a>
+                    <!-- Текст поста -->
+                    {{post.text|linebreaksbr}}
+                </p>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="btn-group ">
+                        <!-- Ссылка на страницу записи в атрибуте href-->
+                        <a class="btn btn-sm text-muted" href="{{post.id}}/comment/" role="button">Добавить комментарий</a>
+                        <!-- Ссылка на редактирование, показывается только автору записи -->
+                        {% if user == post_author %}
+                            <a class="btn btn-sm text-muted" href="{{post.id}}/edit" role="button">Редактировать</a>
+                        {% else %}
+                            <a class="btn btn-sm text-muted" href="{{post.id}}/edit" role="button">Просмотр</a>
+                        {% endif %}
+                    </div>
+                    <!-- Дата публикации  -->
+                    <small class="text-muted">{{post.pub_date}}</small>
+                </div>
+            </div>
+        </div>
+</div>
+        <!-- Конец блока с отдельным постом -->
