@@ -1,20 +1,11 @@
-from django.test import Client, TestCase, override_settings
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
 from django.core.cache.utils import make_template_fragment_key
-
 from posts.models import Group, Post, User, Follow, Comment
 
-from PIL import Image
-import tempfile
 
-TEST_CACHE = {
-    "default": {"BACKEND": "django.core.cache.backends.dummy.DummyCache",}
-}
-
-
-@override_settings(CACHES=TEST_CACHE)
 class ProfileTest(TestCase):
     def setUp(self):
         # создание авторизованного пользователя
@@ -26,7 +17,6 @@ class ProfileTest(TestCase):
 
         # создание неавторизованного пользователя
         self.unauthorized_client = Client()
-        self.unauthorized_client.logout()
 
         # создание тестовой группы
         self.group = Group.objects.create(
@@ -39,13 +29,14 @@ class ProfileTest(TestCase):
 
         # создание тега и картинки
         self.tag = "<img"
-        self.image = self._create_image()
-        self.notImg = self._create_file()
 
-        self.error_message = (
-            "Загрузите правильное изображение. Файл, "
-            "который вы загрузили, поврежден или не "
-            "является изображением."
+        small_gif = (
+            b"\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x00\x00\x00\x21\xf9\x04"
+            b"\x01\x0a\x00\x01\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02"
+            b"\x02\x4c\x01\x00\x3b"
+        )
+        self.image = SimpleUploadedFile(
+            "small.gif", small_gif, content_type="image/gif"
         )
 
     def test_profile(self):
@@ -69,10 +60,7 @@ class ProfileTest(TestCase):
             follow=True,
         )
         self.assertEqual(response.status_code, 200)
-        post = Post.objects.all().first()
-        self.assertEqual(post.author, self.user)
-        self.assertEqual(post.group, self.group)
-        self.assertEqual(post.text, self.text_1)
+        self.assertTrue(Post.objects.filter(text=self.text_1).exists())
 
     def test_new_post_not_auth(self):
         """
@@ -94,6 +82,7 @@ class ProfileTest(TestCase):
 
     def post_contains_params_on_all_pages(self, text):
         # создание списка url страниц на которых могут отображаться посты
+        cache.clear()
         urls = [
             reverse("index"),
             reverse("profile", kwargs={"username": self.user.username}),
@@ -144,13 +133,6 @@ class ProfileTest(TestCase):
         response = self.authorized_client.get("/404/")
         self.assertEqual(response.status_code, 404)
 
-    def _create_image(self):
-        # создание картинки
-        with tempfile.NamedTemporaryFile(suffix=" .png", delete=False) as f:
-            image = Image.new("RGB", (200, 200), "white")
-            image.save(f, "PNG")
-        return open(f.name, mode="rb")
-
     def test_post_view_image(self):
         """
         Проверка отображения картинки на странице конкретного поста.
@@ -158,6 +140,8 @@ class ProfileTest(TestCase):
         post = Post.objects.create(
             text=self.text_1, group=self.group, author=self.user
         )
+        cache.clear()
+
         response = self.authorized_client.post(
             reverse(
                 "post_edit",
@@ -177,7 +161,6 @@ class ProfileTest(TestCase):
         post = Post.objects.create(
             text=self.text_1, group=self.group, author=self.user
         )
-
         response = self.authorized_client.post(
             reverse(
                 "post_edit",
@@ -204,25 +187,21 @@ class ProfileTest(TestCase):
                 response_index = self.authorized_client.get(url)
                 self.assertContains(response_index, self.tag)
 
-    def _create_file(self):
-        file = SimpleUploadedFile("filename.txt", b"hello world", "text/plain")
-        return file
-
     def test_post_without_image(self):
         """
         Проверяю, что срабатывает защита от загрузки файлов не-графических форматов
         """
-        post = Post.objects.create(
-            text=self.text_1, group=self.group, author=self.user
-        )
+        file = SimpleUploadedFile("filename.txt", b"hello world", "text/plain")
+        return file
 
+        self.error_message = (
+            "Загрузите правильное изображение. Файл, "
+            "который вы загрузили, поврежден или не "
+            "является изображением."
+        )
+        url = reverse("new_post")
         response = self.authorized_client.post(
-            reverse(
-                "post_edit",
-                kwargs={"username": self.user.username, "post_id": post.id},
-            ),
-            {"text": {self.text_1}, "image": self.notImg},
-            follow=True,
+            url, {"text": self.text_1, "image": file}
         )
         self.assertFormError(response, "form", "image", self.error_message)
 
@@ -237,7 +216,6 @@ class TestCache(TestCase):
 
     def test_cache(self):
         self.client.get(reverse("index"))
-        self.assertTrue(cache.get(self.key))
         cache.clear()
         self.assertFalse(cache.get(self.key))
 
@@ -246,13 +224,15 @@ class TestFollowing(TestCase):
     # создание авторизованного пользователя
     def setUp(self):
         self.authorized_client = Client()
-        self.unauthorized_client = Client()
         self.first_user = User.objects.create_user(
-            username="leo", email="leo@ya.ru", password="1234"
+            username="Гудаков Дмитрий",
+            email="Gudakov_Dmitry@ya.ru",
+            password="1234",
         )
         self.second_user = User.objects.create_user(
-            username="leo2", email="leo2@ya.ru", password="4321"
+            username="leo", email="leo@ya.ru", password="4321"
         )
+        self.text = "test_text"
 
     def test_follow(self):
         """
@@ -260,7 +240,6 @@ class TestFollowing(TestCase):
         пользователей.
         """
         self.authorized_client.force_login(self.first_user)
-        self.assertEqual(Follow.objects.count(), 0)
         self.authorized_client.post(
             reverse(
                 "profile_follow",
@@ -268,17 +247,26 @@ class TestFollowing(TestCase):
             )
         )
         self.assertEqual(Follow.objects.count(), 1)
+        follow = Follow.objects.first()
+        self.assertEqual(follow.author, self.second_user)
+        self.assertEqual(follow.user, self.first_user)
 
     def test_unfollow(self):
         """
         Авторизованный пользователь может удалять других пользователей
         из подписок.
         """
-        # self.authorized_client.force_login(self.second_user)
-        self.assertEqual(Follow.objects.count(), 0)
-        self.client.post(
+        self.authorized_client.force_login(self.first_user)
+        self.authorized_client.post(
             reverse(
                 "profile_follow",
+                kwargs={"username": self.second_user.username},
+            )
+        )
+        self.assertEqual(Follow.objects.count(), 1)
+        self.authorized_client.post(
+            reverse(
+                "profile_unfollow",
                 kwargs={"username": self.second_user.username},
             )
         )
@@ -301,37 +289,34 @@ class TestFollowing(TestCase):
         response = self.authorized_client.get(reverse("follow_index"))
         self.assertContains(response, self.post.text)
         self.assertEqual(response.status_code, 200)
+
         follow_post = Post.objects.all().first()
         self.assertEqual(follow_post.author, self.post.author)
 
     def test_unfollow_lent(self):
         """
-        Новая запись пользователя не появляется в ленте тех, кто не подписан
-        на него.
+        Новая запись пользователя не появляется в ленте тех,
+        кто не подписан на него.
         """
-        self.post = Post.objects.create(
-            text="Test_text", author=self.second_user
-        )
-        response = self.unauthorized_client.get(reverse("follow_index"))
-        self.login_target = (
-            reverse("login") + "?next=" + reverse("follow_index")
-        )
-        self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, self.login_target)
+        self.authorized_client.force_login(self.first_user)
+        Post.objects.create(text=self.text, author=self.second_user)
+        response = self.authorized_client.get(reverse("follow_index"))
+        self.assertNotContains(response, self.text)
 
 
 class TestComment(TestCase):
     # создание авторизованного пользователя
     def setUp(self):
         self.authorized_client = Client()
-        self.unauthorized_client = Client()
 
         # создание двух авторов и поста для подписки
         self.first_author = User.objects.create_user(
-            username="leo", email="leo@ya.ru", password="1234"
+            username="Гудаков Дмитрий",
+            email="Gudakov_Dmitry@ya.ru",
+            password="1234",
         )
         self.second_author = User.objects.create_user(
-            username="leo2", email="leo2@ya.ru", password="4321"
+            username="leo", email="leo@ya.ru", password="4321"
         )
         self.post_author2 = Post.objects.create(
             text="test_text", author=self.second_author
@@ -363,12 +348,15 @@ class TestComment(TestCase):
         )
         self.assertContains(response, self.test_text)
 
-    def test_only_not_auth_user_add_comment(self):
-        response = reverse(
+    def test_unauth_user_not_add_comment(self):
+        """
+        Неавторизированный пользователь не может комментировать посты.
+        """
+        url_comment = reverse(
             "add_comment",
             kwargs={"username": self.second_author, "post_id": self.post_id},
         )
-        self.authorized_client.post(response, {"text": self.test_text})
+        self.client.post(url_comment, {"text": self.test_text})
         response = self.authorized_client.get(
             reverse(
                 "post",

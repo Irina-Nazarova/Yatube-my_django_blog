@@ -50,6 +50,11 @@ class Post(models.Model):
 
 
 class Comment(models.Model):
+    class Meta:
+        verbose_name = "Комментарий"
+        verbose_name_plural = "Комментарии"
+        ordering = ["-created"]
+
     post = models.ForeignKey(
         Post, on_delete=models.CASCADE, related_name="comments"
     )
