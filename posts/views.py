@@ -122,13 +122,12 @@ def server_error(request):
 @login_required
 def add_comment(request, username, post_id):
     post = get_object_or_404(Post, author__username=username, pk=post_id)
-    form = CommentForm(request.POST or None)
-    if request.method == "POST":
-        if form.is_valid():
-            form.instance.author = request.user
-            form.instance.post = post
-            form.save()
-            return redirect("post", username=username, post_id=post_id)
+    form = CommentForm(request.POST or None, files=request.FILES or None)
+    if form.is_valid():
+        form.instance.author = request.user
+        form.instance.post = post
+        form.save()
+        return redirect("post", username=username, post_id=post_id)
     return render(
         request,
         "post.html",
@@ -164,6 +163,7 @@ def profile_follow(request, username):
     return redirect("profile", username=username)
 
 
+# отписка от надоевшего графомана
 @login_required
 def profile_unfollow(request, username):
     profile_to_unfollow = get_object_or_404(User, username=username)

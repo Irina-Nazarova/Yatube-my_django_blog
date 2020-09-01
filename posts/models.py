@@ -23,7 +23,7 @@ class Post(models.Model):
         verbose_name_plural = "Посты"
         ordering = ["-pub_date"]
 
-    text = models.TextField("текст")
+    text = models.TextField("Текст")
     pub_date = models.DateTimeField(
         "дата публикации", auto_now_add=True, db_index=True
     )
@@ -56,12 +56,18 @@ class Comment(models.Model):
         ordering = ["-created"]
 
     post = models.ForeignKey(
-        Post, on_delete=models.CASCADE, related_name="comments"
+        Post,
+        on_delete=models.CASCADE,
+        related_name="comments",
+        verbose_name="Пост",
     )
     author = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="comments"
+        User,
+        on_delete=models.CASCADE,
+        related_name="comments",
+        verbose_name="Автор",
     )
-    text = models.TextField()
+    text = models.TextField(verbose_name="Текст")
     created = models.DateTimeField("Дата публикации", auto_now_add=True)
 
 

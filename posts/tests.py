@@ -2,7 +2,6 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
-from django.core.cache.utils import make_template_fragment_key
 from posts.models import Group, Post, User, Follow, Comment
 
 
@@ -28,16 +27,7 @@ class ProfileTest(TestCase):
         self.text_2 = "some text test2"
 
         # создание тега и картинки
-        self.tag = "<img"
-
-        small_gif = (
-            b"\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x00\x00\x00\x21\xf9\x04"
-            b"\x01\x0a\x00\x01\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02"
-            b"\x02\x4c\x01\x00\x3b"
-        )
-        self.image = SimpleUploadedFile(
-            "small.gif", small_gif, content_type="image/gif"
-        )
+        self.tag = "<img "
 
     def test_profile(self):
         """
@@ -80,7 +70,7 @@ class ProfileTest(TestCase):
         self.assertRedirects(response, target_url)
         self.assertEqual(Post.objects.count(), 0)
 
-    def post_contains_params_on_all_pages(self, text):
+    def post_contains_params_on_all_pages(self, text, image=None):
         # создание списка url страниц на которых могут отображаться посты
         cache.clear()
         urls = [
@@ -94,7 +84,11 @@ class ProfileTest(TestCase):
         for url in urls:
             with self.subTest(url=url):
                 response = self.authorized_client.get(url)
-            self.assertContains(response, text)
+            if image:
+                self.assertContains(response, image)
+            else:
+                self.assertContains(response, self.group)
+                self.assertContains(response, text)
 
     def test_post_on_all_pages(self):
         """
@@ -133,59 +127,26 @@ class ProfileTest(TestCase):
         response = self.authorized_client.get("/404/")
         self.assertEqual(response.status_code, 404)
 
-    def test_post_view_image(self):
+    def test_post_view_image_display_on_all_pages(self):
         """
-        Проверка отображения картинки на странице конкретного поста.
+        Проверка загрузки и отображения изображеения на всех страницах с
+        постами.
         """
-        post = Post.objects.create(
-            text=self.text_1, group=self.group, author=self.user
+        small_gif = (
+            b"\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x00\x00\x00\x21\xf9\x04"
+            b"\x01\x0a\x00\x01\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02"
+            b"\x02\x4c\x01\x00\x3b"
+        )
+        img = SimpleUploadedFile(
+            "small.gif", small_gif, content_type="image/gif"
+        )
+        post_with_image = Post.objects.create(
+            text=self.text_1, group=self.group, author=self.user, image=img,
         )
         cache.clear()
-
-        response = self.authorized_client.post(
-            reverse(
-                "post_edit",
-                kwargs={"username": self.user.username, "post_id": post.id},
-            ),
-            {"text": self.text_1, "image": self.image},
-            follow=True,
+        self.post_contains_params_on_all_pages(
+            post_with_image.id, image=self.tag
         )
-
-        self.assertContains(response, self.tag)
-
-    def test_post_with_image(self):
-        """
-        Проверяю, что на главной странице, на странице профайла и на странице
-        группы пост с картинкой отображается корректно, с тегом <img>
-        """
-        post = Post.objects.create(
-            text=self.text_1, group=self.group, author=self.user
-        )
-        response = self.authorized_client.post(
-            reverse(
-                "post_edit",
-                kwargs={"username": self.user.username, "post_id": post.id},
-            ),
-            {
-                "text": self.text_1,
-                "image": self.image,
-                "group": self.group.id,
-            },
-            follow=True,
-        )
-
-        urls = [
-            reverse("group_posts", kwargs={"slug": self.group.slug}),
-            reverse("index"),
-            reverse("profile", kwargs={"username": self.user.username}),
-            reverse(
-                "post", kwargs={"username": self.user.username, "post_id": 1}
-            ),
-        ]
-        for url in urls:
-            with self.subTest(url=url):
-                response_index = self.authorized_client.get(url)
-                self.assertContains(response_index, self.tag)
 
     def test_post_without_image(self):
         """
@@ -212,12 +173,37 @@ class TestCache(TestCase):
     """
 
     def setUp(self):
-        self.key = make_template_fragment_key("index_page", [1])
+        # создание авторизованного пользователя
+        self.authorized_client = Client()
+        self.user = User.objects.create_user(
+            username="sarah_cache",
+            email="connor.s@skynet.com",
+            password="12345",
+        )
+        self.authorized_client.force_login(self.user)
+
+        # создание тестовой группы
+        self.group = Group.objects.create(
+            slug="slug", title="title", description="description"
+        )
 
     def test_cache(self):
-        self.client.get(reverse("index"))
+        """ Проверка кеширования главной страницы """
+        response_before_post = self.client.get(reverse("index"))
+        post = Post.objects.create(
+            author=self.user, group=self.group, text="test cache post"
+        )
+        response_after_post = self.client.get(reverse("index"))
+        self.assertEqual(
+            response_before_post.content, response_after_post.content
+        )
+        self.assertNotContains(response_before_post, post.text)
         cache.clear()
-        self.assertFalse(cache.get(self.key))
+        response_after_cache = self.client.get(reverse("index"))
+        self.assertNotEqual(
+            response_after_post.content, response_after_cache.content
+        )
+        self.assertContains(response_after_cache, post.text)
 
 
 class TestFollowing(TestCase):
@@ -232,37 +218,29 @@ class TestFollowing(TestCase):
         self.second_user = User.objects.create_user(
             username="leo", email="leo@ya.ru", password="4321"
         )
+        self.authorized_client.force_login(self.first_user)
         self.text = "test_text"
+
+        self.follow = self.authorized_client.post(
+            reverse("profile_follow", kwargs={"username": self.second_user},)
+        )
 
     def test_follow(self):
         """
         Авторизованный пользователь может подписываться на других
         пользователей.
         """
-        self.authorized_client.force_login(self.first_user)
-        self.authorized_client.post(
-            reverse(
-                "profile_follow",
-                kwargs={"username": self.second_user.username},
-            )
-        )
         self.assertEqual(Follow.objects.count(), 1)
-        follow = Follow.objects.first()
-        self.assertEqual(follow.author, self.second_user)
-        self.assertEqual(follow.user, self.first_user)
+        self.assertTrue(Follow.objects.filter(user=self.first_user).exists())
+        self.assertTrue(
+            Follow.objects.filter(author=self.second_user).exists()
+        )
 
     def test_unfollow(self):
         """
         Авторизованный пользователь может удалять других пользователей
         из подписок.
         """
-        self.authorized_client.force_login(self.first_user)
-        self.authorized_client.post(
-            reverse(
-                "profile_follow",
-                kwargs={"username": self.second_user.username},
-            )
-        )
         self.assertEqual(Follow.objects.count(), 1)
         self.authorized_client.post(
             reverse(
@@ -279,13 +257,6 @@ class TestFollowing(TestCase):
         self.post = Post.objects.create(
             text="Test_text", author=self.second_user
         )
-        self.authorized_client.force_login(self.first_user)
-        self.authorized_client.get(
-            reverse(
-                "profile_follow",
-                kwargs={"username": self.second_user.username},
-            )
-        )
         response = self.authorized_client.get(reverse("follow_index"))
         self.assertContains(response, self.post.text)
         self.assertEqual(response.status_code, 200)
@@ -298,8 +269,7 @@ class TestFollowing(TestCase):
         Новая запись пользователя не появляется в ленте тех,
         кто не подписан на него.
         """
-        self.authorized_client.force_login(self.first_user)
-        Post.objects.create(text=self.text, author=self.second_user)
+        Post.objects.create(text=self.text, author=self.first_user)
         response = self.authorized_client.get(reverse("follow_index"))
         self.assertNotContains(response, self.text)
 
@@ -318,22 +288,22 @@ class TestComment(TestCase):
         self.second_author = User.objects.create_user(
             username="leo", email="leo@ya.ru", password="4321"
         )
-        self.post_author2 = Post.objects.create(
+        self.post_author = Post.objects.create(
             text="test_text", author=self.second_author
         )
-        self.post_id = self.post_author2.id
+        self.post_id = self.post_author.id
         self.test_text = "text_comment"
+        self.url_comment = reverse(
+            "add_comment",
+            kwargs={"username": self.second_author, "post_id": self.post_id},
+        )
 
     def test_only_auth_user_add_comment(self):
         """
         Только авторизированный пользователь может комментировать посты.
         """
-        response = reverse(
-            "add_comment",
-            kwargs={"username": self.second_author, "post_id": self.post_id},
-        )
         self.authorized_client.force_login(self.first_author)
-        self.authorized_client.post(response, {"text": self.test_text})
+        self.authorized_client.post(self.url_comment, {"text": self.test_text})
         response = self.authorized_client.get(
             reverse(
                 "post",
@@ -352,20 +322,9 @@ class TestComment(TestCase):
         """
         Неавторизированный пользователь не может комментировать посты.
         """
-        url_comment = reverse(
-            "add_comment",
-            kwargs={"username": self.second_author, "post_id": self.post_id},
-        )
-        self.client.post(url_comment, {"text": self.test_text})
-        response = self.authorized_client.get(
-            reverse(
-                "post",
-                kwargs={
-                    "username": self.second_author.username,
-                    "post_id": self.post_id,
-                },
-            )
-        )
-        self.assertEqual(
-            0, Comment.objects.filter(text=self.test_text).count()
+        self.client.post(self.url_comment, {"text": self.test_text})
+        self.assertFalse(
+            Comment.objects.filter(
+                text=self.test_text, author=self.second_author
+            ).exists()
         )

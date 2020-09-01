@@ -4,13 +4,10 @@
 
 {% block content %}
     {% include "includes/menu.html" %}
-    {% load cache %}
-    {% cache 20 follow_page page.number %}
         {% for post in page %}
             {% include "includes/post_card.html" with post=post %}
         {% endfor %}
         {% if page.has_other_pages %}
             {% include "includes/paginator.html" with items=page paginator=paginator %}
         {% endif %}
-    {% endcache %}
 {% endblock %}
