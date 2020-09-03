@@ -129,7 +129,7 @@ class ProfileTest(TestCase):
 
     def test_post_view_image_display_on_all_pages(self):
         """
-        Проверка загрузки и отображения изображеения на всех страницах с
+        Проверка загрузки и отображения изображения на всех страницах с
         постами.
         """
         small_gif = (
@@ -221,19 +221,19 @@ class TestFollowing(TestCase):
         self.authorized_client.force_login(self.first_user)
         self.text = "test_text"
 
-        self.follow = self.authorized_client.post(
-            reverse("profile_follow", kwargs={"username": self.second_user},)
-        )
-
     def test_follow(self):
         """
         Авторизованный пользователь может подписываться на других
         пользователей.
         """
+        self.follow = self.authorized_client.post(
+            reverse("profile_follow", kwargs={"username": self.second_user},)
+        )
         self.assertEqual(Follow.objects.count(), 1)
-        self.assertTrue(Follow.objects.filter(user=self.first_user).exists())
         self.assertTrue(
-            Follow.objects.filter(author=self.second_user).exists()
+            Follow.objects.filter(
+                user=self.first_user, author=self.second_user
+            ).exists()
         )
 
     def test_unfollow(self):
@@ -241,6 +241,7 @@ class TestFollowing(TestCase):
         Авторизованный пользователь может удалять других пользователей
         из подписок.
         """
+        Follow.objects.create(user=self.first_user, author=self.second_user)
         self.assertEqual(Follow.objects.count(), 1)
         self.authorized_client.post(
             reverse(
@@ -248,7 +249,11 @@ class TestFollowing(TestCase):
                 kwargs={"username": self.second_user.username},
             )
         )
-        self.assertEqual(Follow.objects.count(), 0)
+        self.assertFalse(
+            Follow.objects.filter(
+                user=self.first_user, author=self.second_user
+            ).exists()
+        )
 
     def test_follow_lent(self):
         """
@@ -256,6 +261,9 @@ class TestFollowing(TestCase):
         """
         self.post = Post.objects.create(
             text="Test_text", author=self.second_user
+        )
+        self.follow = self.authorized_client.post(
+            reverse("profile_follow", kwargs={"username": self.second_user},)
         )
         response = self.authorized_client.get(reverse("follow_index"))
         self.assertContains(response, self.post.text)
