@@ -15,18 +15,25 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import path, include
 from django.contrib.flatpages import views
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic import TemplateView
 
 handler404 = "posts.views.page_not_found"  # noqa
 handler500 = "posts.views.server_error"  # noqa
+
 
 urlpatterns = [
     path("auth/", include("users.urls")),
     path("auth/", include("django.contrib.auth.urls")),
     path("admin/", admin.site.urls),
+    path("api/", include("api.urls")),
+    path(
+        "redoc/",
+        TemplateView.as_view(template_name="redoc.html"),
+        name="redoc"),
     path("", include("posts.urls")),
     path("about/", include("django.contrib.flatpages.urls")),
 ]
