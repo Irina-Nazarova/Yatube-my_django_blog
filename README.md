@@ -1,1 +1,3 @@
-# hw05_final
+# Yatube-my_django_blog
+
+Social network of bloggers
