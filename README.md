@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 **Yatube** — социальная сеть для блогеров
 
 Есть возможность вести свой блог, выкладывать посты с изображениями, группировать публикации по тематике.
@@ -18,8 +18,3 @@ venv\scripts\activate
 `python manage.py runserver`
 
 
-=======
-# Yatube-my_django_blog
-
-Social network of bloggers
->>>>>>> 2fd547fd510496e6adcf74db8abbc26e7138a198
