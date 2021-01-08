@@ -24,14 +24,14 @@ SECRET_KEY = "@k$xqn6fr^ew@v2(8nmltkk00=gf&poqbc4ncl-a4rh=%%y2_*"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-# DEBUG = False
+#DEBUG = False
 
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "[::1]",
     "testserver",
-    "*",
+    "84.201.171.234",
     # "192.168.0.191",
 ]
 INTERNAL_IPS = [
