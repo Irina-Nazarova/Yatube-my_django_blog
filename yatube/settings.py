@@ -11,10 +11,20 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
 import os
-
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import environ
+env = environ.Env()
+environ.Env.read_env()
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
 
+# скопируйте dsn из вашего личного кабинета на Sentry:
+# Projects → <имя-проекта> → Client Keys
+sentry_sdk.init(
+    dsn="https://e29512106b7441f3916c4068445ef29d@o504260.ingest.sentry.io/5590776",
+    integrations=[DjangoIntegration()],
+)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
@@ -23,15 +33,16 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = "@k$xqn6fr^ew@v2(8nmltkk00=gf&poqbc4ncl-a4rh=%%y2_*"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-#DEBUG = False
+#DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
     "[::1]",
     "testserver",
-    "84.201.171.234",
+    "178.154.233.54",
+    "irina.pytools.ru",
     # "192.168.0.191",
 ]
 INTERNAL_IPS = [
@@ -52,7 +63,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "sorl.thumbnail",
-    "debug_toolbar",
+#    "debug_toolbar",
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
@@ -98,11 +109,15 @@ WSGI_APPLICATION = "yatube.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
+#DATABASES = {
+#  "default": {
+#      "ENGINE": "django.db.backends.sqlite3",
+#      "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
+#  }
+#}
+
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
-    }
+    'default': env.db(), # описываем, где искать настройки доступа к базе
 }
 
 
