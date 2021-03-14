@@ -41,9 +41,6 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "[::1]",
     "testserver",
-    "178.154.233.54",
-    "irina.pytools.ru",
-    # "192.168.0.191",
 ]
 INTERNAL_IPS = [
     "127.0.0.1",
