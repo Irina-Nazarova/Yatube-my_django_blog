@@ -16,5 +16,5 @@ regex==2020.11.13
 simplejwt==2.0.1
 six==1.15.0
 sorl-thumbnail==12.7.0
-sqlparse==0.4.1
+sqlparse==0.4.4
 typing==3.7.4.3
